@@ -15,7 +15,7 @@ from datetime import date
 from pathlib import Path
 
 
-QUESTION_TYPES = {"FILL_BLANK", "TRUE_FALSE", "WHQ"}
+QUESTION_TYPES = {"FILL_BLANK", "TRUE_FALSE", "WHQ", "MCQ"}
 
 BLOOM_LEVELS = {
     "Remember", "Understand", "Apply",

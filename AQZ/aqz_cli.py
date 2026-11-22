@@ -8,6 +8,7 @@ from pathlib import Path
 TYPE_NAMES = {
     "FILL_BLANK": "Fill in the Blanks",
     "TRUE_FALSE": "True / False", "WHQ": "WH-Questions",
+    "MCQ": "Multiple choice",
 }
 
 def _parser():

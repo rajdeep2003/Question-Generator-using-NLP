@@ -109,7 +109,7 @@ question candidates.
 '@ | python aqz_cli.py --type WHQ --offered 4 --answer 2 --marks 5
 ```
 
-Supported `--type` values are `WHQ`, `FILL_BLANK`, and `TRUE_FALSE`. Use `--blueprint .\examples\exam_blueprint.json` with `--text-file` to run the
+Supported `--type` values are `WHQ`, `FILL_BLANK`, `TRUE_FALSE`, and `MCQ`. Use `--blueprint .\examples\exam_blueprint.json` with `--text-file` to run the
 sections and quotas from a blueprint. Add `--use-t5` to include T5 question
 generation; otherwise AQZ uses its rules-based generator. The answer and
 classification steps may still load their configured Transformer models when
@@ -145,6 +145,7 @@ Supported section types:
 
 - `FILL_BLANK` — Fill in the Blanks
 - `TRUE_FALSE` — True / False
+- `MCQ` — Four-option multiple choice
 - `WHQ` — WH-Questions (very short, short, and long answers, distinguished by marks)
 
 If AQZ cannot satisfy the blueprint, it displays available candidates as a
@@ -203,7 +204,11 @@ ReportLab question-paper PDF + answer-key PDF + blueprint JSON
    of 180 words with 30 words of overlap (`config.py`).
 4. **Question generation:** `question_generator.py` combines optional T5
    output with source-grounded templates. It handles WHQ across answer lengths, fill-ups,
-   and true/false candidate types. Some WHQ patterns are heuristic.
+   true/false candidates, and MCQs. MCQs use `valhalla/t5-small-qa-qg-hl` via
+   the supplied MultiTaskQAQGPipeline format to generate answer/question pairs,
+   then `fares7elsadek/t5-base-distractor-generation` to generate three choices.
+   The rules-only mode can instead use distinct source definitions as choices.
+   Some WHQ patterns are heuristic.
 5. **Processing:** `question_processor.py` removes duplicates and malformed
    items, infers question type where needed, obtains missing answers,
    and attaches Bloom/difficulty metadata.
@@ -275,6 +280,8 @@ Model names are configured in `config.py`:
 | Purpose | Model |
 |---|---|
 | Question generation | `valhalla/t5-base-e2e-qg` |
+| MCQ question and answer generation | `valhalla/t5-small-qa-qg-hl` |
+| MCQ distractors | `fares7elsadek/t5-base-distractor-generation` |
 | Bloom zero-shot fallback | `facebook/bart-large-mnli` |
 | Extractive answer generation | `deepset/roberta-base-squad2` |
 

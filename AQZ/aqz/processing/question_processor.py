@@ -15,7 +15,7 @@ from collections import deque
 from difflib import SequenceMatcher
 
 MISSING_ANSWER = "Answer could not be confidently extracted."
-QUESTION_TYPES = {"FILL_BLANK", "TRUE_FALSE", "WHQ"}
+QUESTION_TYPES = {"FILL_BLANK", "TRUE_FALSE", "WHQ", "MCQ"}
 
 
 class QuestionSelectionError(ValueError):

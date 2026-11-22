@@ -54,14 +54,18 @@ def _get_question_pipeline():
 
 
 
-def generate_questions(chunks, use_t5=True, max_t5_passages=24):
-    """Return candidates for all supported question types.
+def generate_questions(chunks, use_t5=True, max_t5_passages=24, question_types=None):
+    """Return candidates for supported question types, optionally restricted.
 
     Existing callers may continue using generate_questions(chunks).
     use_t5=False is a FAST, offline rules-only test mode.
     """
     if not chunks:
         return []
+
+    allowed_types = set(question_types) if question_types is not None else {
+        "WHQ", "FILL_BLANK", "TRUE_FALSE", "MCQ"
+    }
 
     # Keep generation orchestration here while each question format exposes
     # its own implementation entry point under generation/types/.
@@ -99,29 +103,36 @@ def generate_questions(chunks, use_t5=True, max_t5_passages=24):
         passages = _passages(chunk)
         for passage_index, passage in enumerate(passages, 1):
             print(f"Generating: chunk {chunk_index}, passage {passage_index}")
-            for item in generate_whq(passage, topic_index=chunk_index - 1):
-                if item.get("suggested_marks", 1) <= 1:
-                    add(item)
-            if qg_model is not None and t5_passages_used < max_t5_passages:
+            if "WHQ" in allowed_types:
+                for item in generate_whq(passage, topic_index=chunk_index - 1):
+                    if item.get("suggested_marks", 1) <= 1:
+                        add(item)
+            if "WHQ" in allowed_types and qg_model is not None and t5_passages_used < max_t5_passages:
                 model_items = generate_whq_with_model(passage, qg_model)
                 t5_passages_used += 1
                 for item in model_items:
                     add({**item, "question_type": "WHQ", "suggested_marks": 1})
 
         # Descriptive and T/F rules use the entire chunk for sufficient evidence.
-        for item in generate_whq(chunk, topic_index=chunk_index - 1):
-            add(item)
-        for item in generate_fill_blank(chunk):
-            add(item)
-        tf_items = generate_true_false(chunk, start_index=tf_index)
-        for item in tf_items:
-            add(item)
-        tf_index += len(tf_items)
+        if "WHQ" in allowed_types:
+            for item in generate_whq(chunk, topic_index=chunk_index - 1):
+                add(item)
+        if "FILL_BLANK" in allowed_types:
+            for item in generate_fill_blank(chunk):
+                add(item)
+        if "TRUE_FALSE" in allowed_types:
+            tf_items = generate_true_false(chunk, start_index=tf_index)
+            for item in tf_items:
+                add(item)
+            tf_index += len(tf_items)
 
     # MCQ distractors are selected across the full source, so collect them
     # once after processing all chunks.
-    for item in generate_mcq(" ".join(str(chunk) for chunk in chunks)):
-        add(item)
+    if "MCQ" in allowed_types:
+        for item in generate_mcq(
+            " ".join(str(chunk) for chunk in chunks), use_model=use_t5
+        ):
+            add(item)
 
     return generated
 

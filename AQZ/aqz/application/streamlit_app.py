@@ -31,13 +31,16 @@ from aqz.blueprint.exam_blueprint import validate_blueprint
 
 TYPE_NAMES = {
     "WHQ": "WH-Questions",
+    "FILL_BLANK": "Fill in the blanks",
+    "TRUE_FALSE": "True / False",
+    "MCQ": "Multiple choice",
 }
 DIFFICULTIES = ("Easy", "Medium", "Hard")
 BLOOMS = ("Remember", "Understand", "Apply", "Analyze", "Evaluate", "Create")
 MAX_UPLOAD_BYTES = 25 * 1024 * 1024
 MAX_PROCESSED_CANDIDATES = 80
 MAX_T5_PASSAGES = 24
-PIPELINE_VERSION = "2026-11-21-clean-source-v1"
+PIPELINE_VERSION = "2026-11-22-selected-types-v2"
 
 
 CSS = """
@@ -500,6 +503,11 @@ def make_pdf(paper, questions, logo_bytes=None, answer_key=False):
                     ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
                 ]))
                 story.append(row)
+                if kind == "MCQ":
+                    for option_index, option in enumerate(item.get("options", [])):
+                        story.append(Paragraph(
+                            f"&nbsp;&nbsp;{chr(65 + option_index)}. {_xml(option)}", body
+                        ))
                 for part_index, part in enumerate(subparts):
                     part_row = Table(
                         [[Paragraph(f"({chr(97 + part_index)})", body),
@@ -518,8 +526,13 @@ def make_pdf(paper, questions, logo_bytes=None, answer_key=False):
                     story.append(part_row)
                 if answer_key:
                     answer = item.get("answer") or "Answer not provided."
+                    if kind == "MCQ" and isinstance(item.get("answer_index"), int):
+                        answer_label = chr(65 + item["answer_index"])
+                        answer_heading = f"Correct option ({answer_label}): "
+                    else:
+                        answer_heading = "Answer / marking points: "
                     story.append(Paragraph(
-                        "<b>Answer / marking points:</b> " + _xml(answer),
+                        "<b>" + _xml(answer_heading) + "</b>" + _xml(answer),
                         answer_style,
                     ))
                     story.append(Paragraph(
@@ -605,6 +618,7 @@ def run_pipeline(pdf_bytes, paper, use_t5=True, quick_test=False, log=None, sour
         chunks,
         use_t5=use_t5,
         max_t5_passages=MAX_T5_PASSAGES,
+        question_types={section["type"] for section in paper["sections"]},
     )
     if not candidates:
         raise ValueError("No questions generated from the document.")
@@ -917,9 +931,32 @@ def app_main():
     b.metric("Candidates generated", report["generated"])
     c.metric("Valid answer candidates", len(report["candidates"]))
     st.markdown("**Available question types**")
-    cols = st.columns(4)
-    for col, (kind, label) in zip(cols, TYPE_NAMES.items()):
+    requested_types = list(dict.fromkeys(section["type"] for section in paper["sections"]))
+    cols = st.columns(len(requested_types))
+    for col, kind in zip(cols, requested_types):
+        label = TYPE_NAMES[kind]
         col.metric(label, report["counts"].get(kind, 0))
+
+    all_question_text = "\n\n".join(
+        f"{index}. [{TYPE_NAMES.get(item.get('question_type'), item.get('question_type', 'Question'))}] "
+        f"{_display_question(item)}"
+        + "".join(
+            f"\n   {chr(option_index + 65)}. {option}"
+            for option_index, option in enumerate(item.get("options", []))
+        )
+        for index, item in enumerate(report["candidates"], 1)
+    )
+    st.markdown("#### Copy all generated questions")
+    st.caption("Select the text below, then press Ctrl+A and Ctrl+C. MCQ choices are included.")
+    st.text_area(
+        "All generated questions", value=all_question_text, height=300,
+        key=f"aqz_all_generated_questions_{signature[:12]}",
+    )
+    st.download_button(
+        "Download all generated questions (.txt)", data=all_question_text,
+        file_name="AQZ_All_Generated_Questions.txt", mime="text/plain",
+        use_container_width=True,
+    )
 
     if report["shortage"]:
         st.error("Cannot build a complete paper from this material: " + report["shortage"])
@@ -938,6 +975,7 @@ def app_main():
                 "Q#": i,
                 "Type": q.get("question_type", "WHQ"),
                 "Question": _display_question(q),
+                "Options": " | ".join(q.get("options", [])),
                 "Answer": str(q.get("answer", "")),
                 "Bloom": str(q.get("bloom", "")),
                 "Difficulty": str(q.get("difficulty", "")),
@@ -945,9 +983,10 @@ def app_main():
         draft_edit = st.data_editor(
             pd.DataFrame(draft_rows), hide_index=True,
             use_container_width=True,
-            disabled=["Q#", "Type", "Bloom", "Difficulty"],
+            disabled=["Q#", "Type", "Options", "Bloom", "Difficulty"],
             column_config={
                 "Question": st.column_config.TextColumn("Question", width="large"),
+                "Options": st.column_config.TextColumn("Options (MCQ)", width="large"),
                 "Answer": st.column_config.TextColumn("Answer", width="large"),
             },
             key="aqz_draft_editor",
@@ -976,7 +1015,9 @@ def app_main():
             }, sort_keys=True, ensure_ascii=False).encode("utf-8")
         ).hexdigest()
         draft_text = "\n\n".join(
-            f"Q{row['Q#']} [{row['Type']}]\n{str(row['Question']).strip()}\n"
+            f"Q{row['Q#']} [{row['Type']}]\n{str(row['Question']).strip()}"
+            + (f"\nOptions: {str(row['Options']).strip()}" if str(row["Options"]).strip() else "")
+            + "\n"
             f"Answer: {str(row['Answer']).strip()}"
             for _, row in draft_edit.iterrows()
         )
@@ -1029,6 +1070,14 @@ def app_main():
                         final_draft.append({
                             "section_id": sec_id, "question_type": kind,
                             "question": question, "answer": answer,
+                            "options": (
+                                candidates[int(row["Q#"]) - 1].get("options", [])
+                                if kind == "MCQ" else []
+                            ),
+                            "answer_index": (
+                                candidates[int(row["Q#"]) - 1].get("answer_index")
+                                if kind == "MCQ" else None
+                            ),
                             "marks": marks, "bloom": row["Bloom"],
                             "difficulty": row["Difficulty"],
                             "subparts": (
