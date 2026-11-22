@@ -36,6 +36,15 @@ Streamlit, pandas, PyTorch, Transformers, PyMuPDF, ReportLab, and some legacy
 packages. The current question-paper workflow does not use Flask, spaCy, NLTK,
 or python-docx directly.
 
+MCQ fallback ranking automatically downloads the Sense2Vec Reddit 2015 vectors
+the first time the fallback needs them. The archive is about 573 MB, so the
+computer needs internet access and enough temporary disk space. The files are
+stored under `AQZ/models/` and are excluded from Git. If the download fails,
+generation continues with lexical ranking. Sense2Vec only ranks answers
+already extracted from the course source; it does not add outside facts as
+answer choices. Set `SENSE2VEC_MODEL_PATH` to use an already downloaded model
+from another location.
+
 ## Install and run on Windows
 
 Open PowerShell in the extracted project folder:
@@ -58,12 +67,18 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process
 .\.venv\Scripts\Activate.ps1
 ```
 
-Install dependencies:
+Install the Python dependencies and prefetch the Sense2Vec 2015 fallback
+vectors in one step:
 
 ```powershell
 python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
+python install.py
 ```
+
+The vector archive is about 573 MB. Other Transformer model weights download
+automatically the first time their feature is used. If you install dependencies
+with `pip install -r requirements.txt` instead, Sense2Vec downloads automatically
+the first time MCQ fallback ranking needs it.
 
 For PyTorch, choose a CPU or CUDA build that matches the computer from the
 [official PyTorch installation selector](https://pytorch.org/get-started/locally/)

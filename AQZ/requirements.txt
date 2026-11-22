@@ -4,6 +4,7 @@ sentencepiece
 accelerate
 flask
 spacy
+sense2vec>=2,<3
 nltk
 pymupdf
 python-docx
