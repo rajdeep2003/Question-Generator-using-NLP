@@ -1,0 +1,57 @@
+{
+  "college_name": "Example Institute of Technology",
+  "college_address": "Example City, India",
+  "university_name": "Example University",
+  "exam_name": "B.Tech Semester Examination",
+  "course_name": "B.Tech",
+  "branch": "Information Technology",
+  "semester": "4",
+  "academic_year": "2026-2027",
+  "subject_name": "Design and Analysis of Algorithms",
+  "paper_code": "PCC-CS404",
+  "exam_date": "2026-12-15",
+  "duration_minutes": 180,
+  "full_marks": 70,
+  "logo_path": "",
+  "teacher_prompt": "Cover important syllabus topics and avoid repeated concepts.",
+  "instructions": [
+    "Figures in the margin indicate full marks.",
+    "Answer the required number of questions from each group."
+  ],
+  "sections": [
+    {
+      "id": "A",
+      "title": "Group A - WH Questions (1 mark)",
+      "type": "WHQ",
+      "offered_count": 12,
+      "answer_count": 10,
+      "marks_each": 1,
+      "bloom_targets": {
+        "Remember": 8,
+        "Understand": 4
+      },
+      "difficulty_targets": {
+        "Easy": 8,
+        "Medium": 4
+      }
+    },
+    {
+      "id": "B",
+      "title": "Group B - WH-Questions",
+      "type": "WHQ",
+      "offered_count": 8,
+      "answer_count": 6,
+      "marks_each": 5,
+      "bloom_targets": {
+        "Understand": 2,
+        "Apply": 1,
+        "Analyze": 2
+      },
+      "difficulty_targets": {
+        "Easy": 1,
+        "Medium": 3,
+        "Hard": 1
+      }
+    }
+  ]
+}
