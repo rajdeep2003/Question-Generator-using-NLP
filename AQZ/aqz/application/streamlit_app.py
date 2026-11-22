@@ -619,6 +619,11 @@ def run_pipeline(pdf_bytes, paper, use_t5=True, quick_test=False, log=None, sour
         use_t5=use_t5,
         max_t5_passages=MAX_T5_PASSAGES,
         question_types={section["type"] for section in paper["sections"]},
+        question_counts={
+            kind: sum(int(section["offered_count"]) for section in paper["sections"]
+                      if section["type"] == kind)
+            for kind in {section["type"] for section in paper["sections"]}
+        },
     )
     if not candidates:
         raise ValueError("No questions generated from the document.")

@@ -131,8 +131,11 @@ def generate(chunk, max_count=10, use_model=True):
                     (item.get("question", "").strip(), item.get("context", "").strip(),
                      item.get("answer", "").strip())
                     for item in valid_items
-                ][:max_count]
-                _log(f"seed validation: accepted={len(valid_items)}, missing_required_fields={len(raw_seeds) - len(valid_items)}, capped_to={len(seeds)}")
+                ]
+                # Preserve a broad pool: poor distractor outputs may invalidate
+                # several seeds before we assemble the requested count.
+                seeds = seeds[:max(max_count * 8, max_count)]
+                _log(f"seed validation: accepted={len(valid_items)}, missing_required_fields={len(raw_seeds) - len(valid_items)}, retained_for_recovery={len(seeds)}")
                 for index, (question, context, answer) in enumerate(seeds[:10], start=1):
                     _log(f"seed {index}: question={preview(question)!r}; answer={preview(answer, 100)!r}; context={preview(context)!r}")
             if not seeds:
@@ -143,6 +146,12 @@ def generate(chunk, max_count=10, use_model=True):
                         _log(f"fallback seed {index}: question={preview(seed[0])!r}; answer={preview(seed[2], 100)!r}; context={preview(seed[1])!r}")
             _log(f"using {len(seeds)} seed(s), max_count={max_count}")
             questions = []
+            answer_pool = list(dict.fromkeys(
+                re.sub(r"\s+", " ", answer).strip(" .,:;-")
+                for _, _, answer in seeds
+                if len(re.sub(r"\s+", " ", answer).strip(" .,:;-")) >= 2
+            ))
+            seen_questions = set()
             for batch_start in range(0, len(seeds), 4):
                 batch = seeds[batch_start:batch_start + 4]
                 _log(f"starting distractor batch {batch_start + 1}-{batch_start + len(batch)} of {len(seeds)}")
@@ -150,9 +159,22 @@ def generate(chunk, max_count=10, use_model=True):
                     batch, tokenizer, distractor_model, device
                 )
                 for (question, context, answer), options in zip(batch, batch_options):
+                    # Top up weak model output with distinct, source-extracted
+                    # answers from other candidate seeds.
+                    for alternative in answer_pool:
+                        if len(options) >= 3:
+                            break
+                        if alternative.casefold() != answer.casefold() and all(
+                            alternative.casefold() != str(option).casefold() for option in options
+                        ):
+                            options.append(alternative)
                     if len(options) != 3:
-                        _log(f"skipping MCQ seed: model returned {len(options)} distractors; expected 3")
+                        _log(f"skipping MCQ seed: only {len(options)} distinct source-grounded distractors available")
                         continue
+                    normalized_question = re.sub(r"\W+", " ", question).casefold().strip()
+                    if normalized_question in seen_questions:
+                        continue
+                    seen_questions.add(normalized_question)
                     correct_position = len(questions) % 4
                     options.insert(correct_position, answer)
                     questions.append({

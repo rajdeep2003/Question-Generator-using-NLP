@@ -70,8 +70,9 @@ class MultiTaskQAQGPipeline:
                 if answers and not answers[-1].strip():
                     answers.pop()
                 for answer in answers:
-                    answer = answer.strip()
-                    if not answer or answer in {"</s>", "<pad>"}:
+                    answer = answer.replace("</s>", " ").replace("<pad>", " ")
+                    answer = " ".join(answer.split()).strip(" .,:;-")
+                    if len(answer) < 2 or "<" in answer or ">" in answer:
                         continue
                     marked_sentence = sentence.replace(answer, f"<hl> {answer} <hl>", 1)
                     source = f"generate question: {marked_sentence}"

@@ -54,7 +54,8 @@ def _get_question_pipeline():
 
 
 
-def generate_questions(chunks, use_t5=True, max_t5_passages=24, question_types=None):
+def generate_questions(chunks, use_t5=True, max_t5_passages=24, question_types=None,
+                       question_counts=None):
     """Return candidates for supported question types, optionally restricted.
 
     Existing callers may continue using generate_questions(chunks).
@@ -130,7 +131,8 @@ def generate_questions(chunks, use_t5=True, max_t5_passages=24, question_types=N
     # once after processing all chunks.
     if "MCQ" in allowed_types:
         for item in generate_mcq(
-            " ".join(str(chunk) for chunk in chunks), use_model=use_t5
+            " ".join(str(chunk) for chunk in chunks), use_model=use_t5,
+            max_count=(question_counts or {}).get("MCQ", 10),
         ):
             add(item)
 
